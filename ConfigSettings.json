@@ -1,0 +1,22 @@
+[{
+        "ClientId": "BCBSID",
+        "ConfigName": "variance_cap",
+        "ConfigType": "decimal",
+        "ConfigValue": "20.00"
+    }, {
+        "ClientId": "BCBSID",
+        "ConfigName": "show_incentives",
+        "ConfigType": "bool",
+        "ConfigValue": "false"
+    }, {
+        "ClientId": "BCBSID",
+        "ConfigName": "site_of_service",
+        "ConfigType": "bool",
+        "ConfigValue": "true"
+    }, {
+        "ClientId": "BCBSID",
+        "ConfigName": "enhance_cost",
+        "ConfigType": "bool",
+        "ConfigValue": "false"
+    }
+]
