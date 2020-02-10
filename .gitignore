@@ -1,0 +1,14 @@
+
+.vs/ConfigManager/DesignTimeBuild/
+
+.vs/ConfigManager/v16/.suo
+
+*.lock
+
+*.ide
+
+.vs/ConfigManager/v16/Server/sqlite3/
+
+bin/Debug/netcoreapp3.0/
+
+obj/
