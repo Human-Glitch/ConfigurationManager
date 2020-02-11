@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -88,7 +89,6 @@ namespace ConfigManager
 
         public string GenerateReport(SqlConnection conn)
         {
-            var settings = new List<Setting>();
             var sqlCommand = new SqlCommand();
 
             conn.Open();
@@ -97,6 +97,7 @@ namespace ConfigManager
             sqlCommand.Connection = conn;
             sqlCommand.CommandText = "SELECT * FROM dbo.ConfigSettings ORDER BY id";
 
+            var settings = new List<Setting>();
             SqlDataReader reader = sqlCommand.ExecuteReader();
             while (reader.Read())
             {
@@ -161,17 +162,49 @@ namespace ConfigManager
         {
             var files = new List<string>();
 
-            Console.WriteLine("What's the file path to the settings you want to add?");
-            string settingsFile = Console.ReadLine();
+            // Generate json template for importing config settings
+            string tempPath = @$"{Path.GetTempPath()}\ImportConfigSettings.json";
+            File.WriteAllText(tempPath, GenerateTemplateSettings());
+            
+            // Open the json file in the user's default app
+            var p = new Process();
+            p.StartInfo = new ProcessStartInfo(tempPath)
+            {
+                UseShellExecute = true
+            };
+            p.Start();
 
-            var importFile = Regex.Replace(File.ReadAllText(@"C:\Users\kodyb\Documents\WriteText.json"), @"\t|\n|\r", string.Empty);
+            // Wait for the user to save the desired settings to import.
+            Console.WriteLine("Press [Enter] after you save the desired setting to import.");
+            Console.Read();
+
+            string importFile = Regex.Replace(File.ReadAllText(tempPath), @"\t|\n|\r", string.Empty);
 
             files.Add(GenerateReport(conn));
             files.Add(importFile);
 
+            // Remove temporary file
+            File.Delete(tempPath);
+
+            // Merge the historical data with the desired changes in a format for PR.
             var result = JToken.Parse(MergeJsons(files)).ToString(Formatting.Indented);
             Console.WriteLine(result);
+        }
 
+        private string GenerateTemplateSettings()
+        {
+            return JsonConvert.SerializeObject(
+                new List<Setting>
+                {
+                    new Setting
+                    {
+                       ClientId = string.Empty,
+                       ConfigName = string.Empty,
+                       ConfigType = string.Empty,
+                       ConfigValue = string.Empty
+                    }
+                }
+            );
         }
 
         private string RemoveBrackets(string content)
