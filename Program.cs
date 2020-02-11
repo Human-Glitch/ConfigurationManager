@@ -1,8 +1,11 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Linq;
+using System.Text;
 
 namespace ConfigManager
 {
@@ -13,33 +16,37 @@ namespace ConfigManager
         static void Main(string[] args)
         {
             var menu = new Menu();
-            // Menu
             menu.ShowMenu();
+            ConsoleKey option = Console.ReadKey().Key;
 
             using(SqlConnection conn = new SqlConnection()) 
             {
                 conn.ConnectionString = "Server=localhost;Database=master;Trusted_Connection=True;";
-
-                ConsoleKey option = Console.ReadKey().Key;
-
+                
                 while(option != ConsoleKey.D4)
                 {
                     switch(option)
                     {
                         case ConsoleKey.D1:
-                            menu.GenerateReport(conn);
+                            var json = menu.GenerateReport(conn);
+                            Console.WriteLine(json);
+
                             menu.ShowMenu();
                             option = Console.ReadKey().Key;
                             break;
+
                         case ConsoleKey.D2:
-                            menu.InsertNewSettings(conn);
+                            menu.InsertNewSetting(conn);
                             menu.ShowMenu();
                             option = Console.ReadKey().Key;
                             break;
+
                         case ConsoleKey.D3:
+                            menu.PullRequestNewConfigSettings(conn);
                             menu.ShowMenu();
                             option = Console.ReadKey().Key;
                             break;
+
                         case ConsoleKey.D4:
                             break;
                     }
@@ -77,16 +84,17 @@ namespace ConfigManager
             "[4] Exit"
         };
 
-        public void GenerateReport(SqlConnection conn)
+        public string GenerateReport(SqlConnection conn)
         {
             var settings = new List<Setting>();
             var sqlCommand = new SqlCommand();
 
             conn.Open();
-            Console.WriteLine(conn.State);
+            Console.WriteLine(Environment.NewLine + conn.State);
 
             sqlCommand.Connection = conn;
             sqlCommand.CommandText = "SELECT * FROM dbo.ConfigSettings ORDER BY id";
+
             SqlDataReader reader = sqlCommand.ExecuteReader();
             while (reader.Read())
             {
@@ -99,25 +107,37 @@ namespace ConfigManager
                 settings.Add(someComplexItem);
             }
 
-            var json = JsonConvert.SerializeObject(settings);
-
-            Console.WriteLine(json);
+            string json = JToken.Parse(JsonConvert.SerializeObject(settings)).ToString(Formatting.Indented);
 
             conn.Close();
             Console.WriteLine(conn.State);
+
+            return json;
         }
 
-        public void InsertNewSettings(SqlConnection conn)
+        public void InsertNewSetting(SqlConnection conn)
         {
             conn.Open();
-            Console.WriteLine(conn.State);
+            Console.WriteLine(Environment.NewLine + conn.State);
+
+            Console.WriteLine("Which client?");
+            var clientId = Console.ReadLine();
+
+            Console.WriteLine("What's the config setting name?");
+            var configName = Console.ReadLine();
+
+            Console.WriteLine("What's the config setting type?");
+            var configType = Console.ReadLine();
+
+            Console.WriteLine("What's the config value?");
+            var configValue = Console.ReadLine();
 
             var setting = new Setting
             {
-                ClientId = "BCBSID",
-                ConfigName = "enhance_cost",
-                ConfigType = "bool",
-                ConfigValue = "false"
+                ClientId = clientId,
+                ConfigName = configName,
+                ConfigType = configType,
+                ConfigValue = configValue
             };
 
             SqlCommand cmd  = new SqlCommand("dbo.uspInsertSettingDefinition", conn) 
@@ -133,6 +153,56 @@ namespace ConfigManager
 
             conn.Close();
             Console.WriteLine(conn.State);
+        }
+
+        public void PullRequestNewConfigSettings(SqlConnection conn)
+        {
+            var files = new List<string>();
+            files.Add(GenerateReport(conn));
+
+            Console.WriteLine("What's the file path to the settings you want to add?");
+            //string settingsFile = Console.ReadLine();
+
+            var importFile = System.IO.File.ReadAllText(@"C:\Users\kodyb\Documents\WriteText.json");
+            files.Add(importFile);
+
+            var result = MergeJsons(files);
+
+            Console.WriteLine(result);
+
+        }
+
+        private string RemoveBrackets(string content)
+        {
+            var openB = content.IndexOf("[");
+            content = content.Substring(openB + 1, content.Length - openB - 1);
+
+            var closeB = content.LastIndexOf("]");
+            content = content.Substring(0, closeB);
+
+            return content;
+        }
+
+        private string MergeJsons(List<string> jsons)
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine("[");     
+            for(var i=0; i<jsons.Count; i++)   
+            {
+                var json = jsons[i];
+                var cleared = RemoveBrackets(json);
+                sb.AppendLine(cleared);
+                if (i != jsons.Count-1) sb.Append(",");
+            }
+
+            sb.AppendLine("]");     
+            return sb.ToString();
+        }
+
+        public bool EncryptSettings()
+        {
+            return true;
         }
     }
 
