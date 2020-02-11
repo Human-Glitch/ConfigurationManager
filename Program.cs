@@ -15,87 +15,88 @@ namespace ConfigManager
 
     class Program
     {
-       
         static void Main(string[] args)
         {
-            var menu = new Menu();
-            menu.ShowMenu();
-            ConsoleKey option = Console.ReadKey().Key;
-
             using(SqlConnection conn = new SqlConnection()) 
             {
-                conn.ConnectionString = "Server=localhost;Database=master;Trusted_Connection=True;";
+                var configManager = new ConfigurationManager(conn);
+
+                ShowMenu();
+                ConsoleKey option = Console.ReadKey().Key;
                 
                 while(option != ConsoleKey.D4)
                 {
                     switch(option)
                     {
+                        // Display Historical Config Settings
                         case ConsoleKey.D1:
-                            var json = JToken.Parse(menu.GenerateReport(conn)).ToString(Formatting.Indented);
+                            var json = JToken.Parse(configManager.GetHistoricalConfigSettings()).ToString(Formatting.Indented);
                             Console.WriteLine(json);
 
-                            menu.ShowMenu();
+                            ShowMenu();
                             option = Console.ReadKey().Key;
                             break;
 
+                        // Deploy New Settings
                         case ConsoleKey.D2:
-                            menu.InsertNewSetting(conn);
-                            menu.ShowMenu();
+                            configManager.DeployNewSettings();
+                            ShowMenu();
                             option = Console.ReadKey().Key;
                             break;
 
+                        // PR New Settings
                         case ConsoleKey.D3:
-                            menu.PullRequestNewConfigSettings(conn);
-                            menu.ShowMenu();
+                            configManager.PullRequestNewConfigSettings();
+                            ShowMenu();
                             option = Console.ReadKey().Key;
                             break;
 
+                        // Exit Application
                         case ConsoleKey.D4:
                             break;
                     }
                 }
-
-                Console.Read();
             }
-        } 
-    }
-
-    public class Menu
-    {
-        public void ShowMenu()
+            Console.Read();
+        }
+        
+        public static void ShowMenu()
         {
-            foreach (var item in MenuOptions)
+            var menuOptions = new List<string>
+            {
+                Environment.NewLine,
+                "[1] Generate Config Settings Report",
+                "[2] Insert New Setting",
+                "[3] PR New Settings",
+                "[4] Exit"
+            };
+
+            foreach (var item in menuOptions)
             {
                 Console.WriteLine(item);
             }
         }
+    }
 
-        public enum Options
+    public class ConfigurationManager
+    {
+        protected SqlConnection Connection {get; set;}
+
+        public ConfigurationManager(SqlConnection conn)
         {
-            GenerateReport = 1,
-            InsertNewSetting = 2,
-            PR = 3,
-            Exit = 4
-        };
+            Connection = conn;
+            Connection.ConnectionString = "Server=localhost;Database=master;Trusted_Connection=True;";
+        }
 
-        public List<string> MenuOptions {get; } = new List<string>
-        {
-            Environment.NewLine,
-            "[1] Generate Config Settings Report",
-            "[2] Insert New Setting",
-            "[3] PR New Settings",
-            "[4] Exit"
-        };
-
-        public string GenerateReport(SqlConnection conn)
+        public string GetHistoricalConfigSettings()
         {
             var sqlCommand = new SqlCommand();
 
-            conn.Open();
-            Console.WriteLine(Environment.NewLine + conn.State);
+            Connection.Open();
+            Console.WriteLine(Environment.NewLine + Connection.State);
 
-            sqlCommand.Connection = conn;
-            sqlCommand.CommandText = "SELECT * FROM dbo.ConfigSettings ORDER BY id";
+            sqlCommand.Connection = Connection;
+            sqlCommand.CommandText = "SELECT * FROM dbo.ConfigSettings ORDER BY clientid ASC, SettingName ASC";
 
             var settings = new List<Setting>();
             SqlDataReader reader = sqlCommand.ExecuteReader();
@@ -119,16 +120,16 @@ namespace ConfigManager
 
             string json = JsonConvert.SerializeObject(settings);
 
-            conn.Close();
-            Console.WriteLine(conn.State);
+            Connection.Close();
+            Console.WriteLine(Connection.State);
 
             return json;
         }
 
-        public void InsertNewSetting(SqlConnection conn)
+        public void DeployNewSettings()
         {
-            conn.Open();
-            Console.WriteLine(Environment.NewLine + conn.State);
+            Connection.Open();
+            Console.WriteLine(Environment.NewLine + Connection.State);
 
             var importSettings = JsonConvert.DeserializeObject<List<Setting>>(GenerateImportSettings());
 
@@ -143,7 +144,7 @@ namespace ConfigManager
                     IsEncrypted = item.IsEncrypted
                 };
 
-                SqlCommand cmd  = new SqlCommand("dbo.uspInsertSettingDefinition", conn) 
+                SqlCommand cmd  = new SqlCommand("dbo.uspInsertSettingDefinition", Connection) 
                 {
                     CommandType = CommandType.StoredProcedure
                 };
@@ -157,16 +158,16 @@ namespace ConfigManager
                 cmd.ExecuteNonQuery();
             }
 
-            conn.Close();
-            Console.WriteLine(conn.State);
+            Connection.Close();
+            Console.WriteLine(Connection.State);
         }
 
-        public void PullRequestNewConfigSettings(SqlConnection conn)
+        public void PullRequestNewConfigSettings()
         {
             var files = new List<string>();
             string importFile = GenerateImportSettings();
 
-            files.Add(GenerateReport(conn));
+            files.Add(GetHistoricalConfigSettings());
             files.Add(importFile);
             
             // Merge the historical data with the desired changes in a format for PR.
