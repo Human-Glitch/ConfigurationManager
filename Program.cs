@@ -175,7 +175,7 @@ namespace ConfigManager
             p.Start();
 
             // Wait for the user to save the desired settings to import.
-            Console.WriteLine("Press [Enter] after you save the desired setting to import.");
+            Console.WriteLine(Environment.NewLine + "Press [Enter] after you save the desired setting to import.");
             Console.Read();
 
             string importFile = Regex.Replace(File.ReadAllText(tempPath), @"\t|\n|\r", string.Empty);
