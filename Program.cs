@@ -4,8 +4,10 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace ConfigManager
 {
@@ -107,7 +109,7 @@ namespace ConfigManager
                 settings.Add(someComplexItem);
             }
 
-            string json = JToken.Parse(JsonConvert.SerializeObject(settings)).ToString(Formatting.Indented);
+            string json = JsonConvert.SerializeObject(settings);
 
             conn.Close();
             Console.WriteLine(conn.State);
@@ -158,16 +160,16 @@ namespace ConfigManager
         public void PullRequestNewConfigSettings(SqlConnection conn)
         {
             var files = new List<string>();
-            files.Add(GenerateReport(conn));
 
             Console.WriteLine("What's the file path to the settings you want to add?");
-            //string settingsFile = Console.ReadLine();
+            string settingsFile = Console.ReadLine();
 
-            var importFile = System.IO.File.ReadAllText(@"C:\Users\kodyb\Documents\WriteText.json");
+            var importFile = Regex.Replace(File.ReadAllText(@"C:\Users\kodyb\Documents\WriteText.json"), @"\t|\n|\r", string.Empty);
+
+            files.Add(GenerateReport(conn));
             files.Add(importFile);
 
-            var result = MergeJsons(files);
-
+            var result = JToken.Parse(MergeJsons(files)).ToString(Formatting.Indented);
             Console.WriteLine(result);
 
         }
