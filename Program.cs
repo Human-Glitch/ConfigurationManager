@@ -31,7 +31,7 @@ namespace ConfigManager
                     switch(option)
                     {
                         case ConsoleKey.D1:
-                            var json = menu.GenerateReport(conn);
+                            var json = JToken.Parse(menu.GenerateReport(conn)).ToString(Formatting.Indented);
                             Console.WriteLine(json);
 
                             menu.ShowMenu();
@@ -101,13 +101,20 @@ namespace ConfigManager
             SqlDataReader reader = sqlCommand.ExecuteReader();
             while (reader.Read())
             {
-                var someComplexItem = new Setting();
-                someComplexItem.ClientId = reader[1].ToString();
-                someComplexItem.ConfigName = reader[2].ToString();
-                someComplexItem.ConfigType = reader[3].ToString();
-                someComplexItem.ConfigValue = reader[4].ToString();
+                bool isEncrypted;
+                bool.TryParse(reader[5].ToString(), out isEncrypted);
 
-                settings.Add(someComplexItem);
+                var setting = new Setting
+                {
+                    ClientId = reader[1].ToString(),
+                    SettingName = reader[2].ToString(),
+                    SettingType = reader[3].ToString(),
+                    SettingValue = isEncrypted ? Security.EncryptString(reader[4].ToString()) : reader[4].ToString(),
+                    SettingLevel = reader[6].ToString(),
+                    IsEncrypted = isEncrypted
+                };
+
+                settings.Add(setting);
             }
 
             string json = JsonConvert.SerializeObject(settings);
@@ -123,36 +130,32 @@ namespace ConfigManager
             conn.Open();
             Console.WriteLine(Environment.NewLine + conn.State);
 
-            Console.WriteLine("Which client?");
-            var clientId = Console.ReadLine();
+            var importSettings = JsonConvert.DeserializeObject<List<Setting>>(GenerateImportSettings());
 
-            Console.WriteLine("What's the config setting name?");
-            var configName = Console.ReadLine();
-
-            Console.WriteLine("What's the config setting type?");
-            var configType = Console.ReadLine();
-
-            Console.WriteLine("What's the config value?");
-            var configValue = Console.ReadLine();
-
-            var setting = new Setting
+            foreach(var item in importSettings)
             {
-                ClientId = clientId,
-                ConfigName = configName,
-                ConfigType = configType,
-                ConfigValue = configValue
-            };
+                var setting = new Setting
+                {
+                    ClientId = item.ClientId ?? string.Empty,
+                    SettingName = item.SettingName ?? string.Empty,
+                    SettingType = item.SettingType ?? string.Empty,
+                    SettingValue = item.SettingValue ?? string.Empty,
+                    IsEncrypted = item.IsEncrypted
+                };
 
-            SqlCommand cmd  = new SqlCommand("dbo.uspInsertSettingDefinition", conn) 
-            {
-                CommandType = CommandType.StoredProcedure
-            };
-                
-            cmd.Parameters.Add(new SqlParameter("@ClientId", setting.ClientId));
-            cmd.Parameters.Add(new SqlParameter("@ConfigName", setting.ConfigName));
-            cmd.Parameters.Add(new SqlParameter("@ConfigType", setting.ConfigType));
-            cmd.Parameters.Add(new SqlParameter("@ConfigValue", setting.ConfigValue));
-            cmd.ExecuteNonQuery();
+                SqlCommand cmd  = new SqlCommand("dbo.uspInsertSettingDefinition", conn) 
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
+
+                cmd.Parameters.Add(new SqlParameter("@ClientId", setting.ClientId));
+                cmd.Parameters.Add(new SqlParameter("@SettingLevel", setting.ClientId));
+                cmd.Parameters.Add(new SqlParameter("@SettingName", setting.SettingName));
+                cmd.Parameters.Add(new SqlParameter("@SettingType", setting.SettingType));
+                cmd.Parameters.Add(new SqlParameter("@SettingValue", setting.SettingValue));
+                cmd.Parameters.Add(new SqlParameter("@IsEncrypted", setting.IsEncrypted));
+                cmd.ExecuteNonQuery();
+            }
 
             conn.Close();
             Console.WriteLine(conn.State);
@@ -161,11 +164,22 @@ namespace ConfigManager
         public void PullRequestNewConfigSettings(SqlConnection conn)
         {
             var files = new List<string>();
+            string importFile = GenerateImportSettings();
 
+            files.Add(GenerateReport(conn));
+            files.Add(importFile);
+            
+            // Merge the historical data with the desired changes in a format for PR.
+            var result = JToken.Parse(MergeJsons(files)).ToString(Formatting.Indented);
+            Console.WriteLine(result);
+        }
+
+        private string GenerateImportSettings()
+        {
             // Generate json template for importing config settings
             string tempPath = @$"{Path.GetTempPath()}\ImportConfigSettings.json";
             File.WriteAllText(tempPath, GenerateTemplateSettings());
-            
+
             // Open the json file in the user's default app
             var p = new Process();
             p.StartInfo = new ProcessStartInfo(tempPath)
@@ -178,17 +192,13 @@ namespace ConfigManager
             Console.WriteLine(Environment.NewLine + "Press [Enter] after you save the desired setting to import.");
             Console.Read();
 
-            string importFile = Regex.Replace(File.ReadAllText(tempPath), @"\t|\n|\r", string.Empty);
-
-            files.Add(GenerateReport(conn));
-            files.Add(importFile);
+            // Remove formatting from file
+            var result = Regex.Replace(File.ReadAllText(tempPath), @"\t|\n|\r", string.Empty);
 
             // Remove temporary file
             File.Delete(tempPath);
 
-            // Merge the historical data with the desired changes in a format for PR.
-            var result = JToken.Parse(MergeJsons(files)).ToString(Formatting.Indented);
-            Console.WriteLine(result);
+            return result;
         }
 
         private string GenerateTemplateSettings()
@@ -199,9 +209,11 @@ namespace ConfigManager
                     new Setting
                     {
                        ClientId = string.Empty,
-                       ConfigName = string.Empty,
-                       ConfigType = string.Empty,
-                       ConfigValue = string.Empty
+                       SettingLevel = string.Empty,
+                       SettingName = string.Empty,
+                       SettingType = string.Empty,
+                       SettingValue = string.Empty,
+                       IsEncrypted = false
                     }
                 }
             );
@@ -234,18 +246,42 @@ namespace ConfigManager
             sb.AppendLine("]");     
             return sb.ToString();
         }
+    }
 
-        public bool EncryptSettings()
-        {
-            return true;
+    public static class Security
+    {
+        public static string DecryptString(string encryptString)  
+        {  
+            byte[] b;  
+            string decrypted;  
+            try  
+            {  
+                b = Convert.FromBase64String(encryptString);  
+                decrypted = System.Text.ASCIIEncoding.ASCII.GetString(b);  
+            }  
+            catch (FormatException fe)   
+            {  
+                decrypted = string.Empty;  
+            }  
+
+            return decrypted;  
+        }  
+  
+        public static string EncryptString(string encryptedString)   
+        {  
+            byte[] b = System.Text.ASCIIEncoding.ASCII.GetBytes(encryptedString);  
+            string encrypted = Convert.ToBase64String(b);  
+            return encrypted;  
         }
     }
 
     class Setting
     {
         public string ClientId {get; set;}
-        public string ConfigName {get; set;}
-        public string ConfigType {get; set;}
-        public string ConfigValue {get; set;}
+        public string SettingLevel {get; set;}
+        public string SettingName {get; set;}
+        public string SettingType {get; set;}
+        public string SettingValue {get; set;}
+        public bool IsEncrypted {get; set;}
     }
 }
