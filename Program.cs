@@ -24,7 +24,7 @@ namespace ConfigManager
                 ShowMenu();
                 ConsoleKey option = Console.ReadKey().Key;
                 
-                while(option != ConsoleKey.D4)
+                while(option != ConsoleKey.D5)
                 {
                     switch(option)
                     {
@@ -37,22 +37,33 @@ namespace ConfigManager
                             option = Console.ReadKey().Key;
                             break;
 
-                        // Deploy New Settings
-                        case ConsoleKey.D2:
-                            configManager.DeployNewSettings();
-                            ShowMenu();
-                            option = Console.ReadKey().Key;
-                            break;
-
                         // PR New Settings
-                        case ConsoleKey.D3:
+                        case ConsoleKey.D2:
                             configManager.PullRequestNewConfigSettings();
                             ShowMenu();
                             option = Console.ReadKey().Key;
                             break;
 
-                        // Exit Application
+                        // Add New Settings
+                        case ConsoleKey.D3:
+                            configManager.AddNewSettings();
+                            ShowMenu();
+                            option = Console.ReadKey().Key;
+                            break;
+
+                        // Import New Settings
                         case ConsoleKey.D4:
+                            configManager.ImportNewSettings();
+                            ShowMenu();
+                            option = Console.ReadKey().Key;
+                            break;
+
+                        // Exit Application
+                        case ConsoleKey.D5:
+                            break;
+
+                        default:
+                            option = Console.ReadKey().Key;
                             break;
                     }
                 }
@@ -66,9 +77,10 @@ namespace ConfigManager
             {
                 Environment.NewLine,
                 "[1] Generate Config Settings Report",
-                "[2] Insert New Setting",
-                "[3] PR New Settings",
-                "[4] Exit"
+                "[2] Generate New Settings for PR",
+                "[3] Manually Add New Settings",
+                "[4] Import New Settings",
+                "[5] Exit"
             };
 
             foreach (var item in menuOptions)
@@ -126,7 +138,7 @@ namespace ConfigManager
             return json;
         }
 
-        public void DeployNewSettings()
+        public void AddNewSettings()
         {
             Connection.Open();
             Console.WriteLine(Environment.NewLine + Connection.State);
@@ -160,6 +172,72 @@ namespace ConfigManager
 
             Connection.Close();
             Console.WriteLine(Connection.State);
+        }
+
+        public void ImportNewSettings()
+        {
+            try
+            {
+
+                Console.WriteLine(Environment.NewLine + "Enter a file path for the desired import settings.");
+                var filePath = Console.ReadLine();
+                var importData = File.ReadAllText(filePath);
+                var historicalData = GetHistoricalConfigSettings();
+
+                var historicalJson = (JArray)JsonConvert.DeserializeObject(historicalData);
+                var importJson = (JArray)JsonConvert.DeserializeObject(importData);
+
+                var historicalSettings = historicalJson.Children().OrderBy(x => x["clientId"]).ToList();
+                var importSettings = importJson.Children().OrderBy(x => x["clientId"]).ToList();
+
+                JArray modifySettingList = new JArray();
+                foreach(var setting in importSettings)
+                {
+                    if(historicalSettings.Any(x => JToken.EqualityComparer.Equals(x, setting)))
+                    {
+                        continue;
+                    }
+
+                    modifySettingList.Add(setting);
+                }
+
+                var settings = JsonConvert.DeserializeObject<List<Setting>>(JsonConvert.SerializeObject(modifySettingList));
+
+                Connection.Open();
+                Console.WriteLine(Connection.State);
+
+                foreach (var setting in settings)
+                {
+                    var settingToInject = new Setting
+                    {
+                        ClientId = setting.ClientId ?? string.Empty,
+                        SettingName = setting.SettingName ?? string.Empty,
+                        SettingType = setting.SettingType ?? string.Empty,
+                        SettingValue = setting.SettingValue ?? string.Empty,
+                        IsEncrypted = setting.IsEncrypted
+                    };
+
+                    SqlCommand cmd = new SqlCommand("dbo.uspInsertSettingDefinition", Connection)
+                    {
+                        CommandType = CommandType.StoredProcedure
+                    };
+
+                    cmd.Parameters.Add(new SqlParameter("@ClientId", settingToInject.ClientId));
+                    cmd.Parameters.Add(new SqlParameter("@SettingLevel", settingToInject.SettingLevel));
+                    cmd.Parameters.Add(new SqlParameter("@SettingName", settingToInject.SettingName));
+                    cmd.Parameters.Add(new SqlParameter("@SettingType", settingToInject.SettingType));
+                    cmd.Parameters.Add(new SqlParameter("@SettingValue", settingToInject.SettingValue));
+                    cmd.Parameters.Add(new SqlParameter("@IsEncrypted", settingToInject.IsEncrypted));
+                    cmd.ExecuteNonQuery();
+                }
+
+                Connection.Close();
+                Console.WriteLine(Connection.State);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
         }
 
         public void PullRequestNewConfigSettings()
