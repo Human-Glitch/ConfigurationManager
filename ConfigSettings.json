@@ -1,7 +1,7 @@
 [
   {
     "ClientId": "BCBSID",
-    "SettingLevel": "",
+    "SettingLevel": "plan",
     "SettingName": "enhance_cost",
     "SettingType": "bool",
     "SettingValue": "false",
@@ -9,7 +9,7 @@
   },
   {
     "ClientId": "BCBSID",
-    "SettingLevel": "",
+    "SettingLevel": "client",
     "SettingName": "site_of_service",
     "SettingType": "bool",
     "SettingValue": "true",
@@ -17,7 +17,7 @@
   },
   {
     "ClientId": "BCBSKS",
-    "SettingLevel": "BCBSKS",
+    "SettingLevel": "client",
     "SettingName": "variance_cap",
     "SettingType": "decimal",
     "SettingValue": "TWpBdU1EQT0=",
@@ -25,7 +25,15 @@
   },
   {
     "ClientId": "BCBSTN",
-    "SettingLevel": "",
+    "SettingLevel": "client",
+    "SettingName": "is_site_of_service",
+    "SettingType": "bool",
+    "SettingValue": "true",
+    "IsEncrypted": false
+  },
+  {
+    "ClientId": "BCBSTN",
+    "SettingLevel": "plan",
     "SettingName": "show_incentives",
     "SettingType": "bool",
     "SettingValue": "true",
@@ -37,14 +45,6 @@
     "SettingName": "variance_cap",
     "SettingType": "decimal",
     "SettingValue": "40.00",
-    "IsEncrypted": false
-  },
-  {
-    "ClientId": "BCBSTN",
-    "SettingLevel": "client",
-    "SettingName": "is_site_of_service",
-    "SettingType": "bool",
-    "SettingValue": "true",
     "IsEncrypted": false
   }
 ]
