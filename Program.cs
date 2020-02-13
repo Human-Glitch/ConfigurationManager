@@ -28,9 +28,9 @@ namespace ConfigManager
                 {
                     switch(option)
                     {
-                        // Display Historical Config Settings
+                        // Display Database Config Settings
                         case ConsoleKey.D1:
-                            var json = JToken.Parse(configManager.GetHistoricalConfigSettings()).ToString(Formatting.Indented);
+                            var json = JToken.Parse(configManager.GetDatabaseConfigSettings()).ToString(Formatting.Indented);
                             Console.WriteLine(json);
 
                             ShowMenu();
@@ -39,7 +39,7 @@ namespace ConfigManager
 
                         // PR New Settings
                         case ConsoleKey.D2:
-                            configManager.PullRequestNewConfigSettings();
+                            configManager.GeneratePullRequestFile();
                             ShowMenu();
                             option = Console.ReadKey().Key;
                             break;
@@ -76,7 +76,7 @@ namespace ConfigManager
             var menuOptions = new List<string>
             {
                 Environment.NewLine,
-                "[1] Generate Config Settings Report",
+                "[1] Display Database Config Settings",
                 "[2] Generate New Settings for PR",
                 "[3] Manually Add New Settings",
                 "[4] Import New Settings",
@@ -100,7 +100,7 @@ namespace ConfigManager
             Connection.ConnectionString = "Server=localhost;Database=master;Trusted_Connection=True;";
         }
 
-        public string GetHistoricalConfigSettings()
+        public string GetDatabaseConfigSettings()
         {
             var sqlCommand = new SqlCommand();
 
@@ -178,17 +178,16 @@ namespace ConfigManager
         {
             try
             {
-
                 Console.WriteLine(Environment.NewLine + "Enter a file path for the desired import settings.");
                 var filePath = Console.ReadLine();
-                var importData = File.ReadAllText(filePath);
-                var historicalData = GetHistoricalConfigSettings();
+                var importSettingsJson = File.ReadAllText(filePath);
+                var databaseSettingsJson = GetDatabaseConfigSettings();
 
-                var historicalJson = (JArray)JsonConvert.DeserializeObject(historicalData);
-                var importJson = (JArray)JsonConvert.DeserializeObject(importData);
+                var databaseSettingsJsonModel = (JArray)JsonConvert.DeserializeObject(databaseSettingsJson);
+                var importSettingsJsonModel = (JArray)JsonConvert.DeserializeObject(importSettingsJson);
 
-                var historicalSettings = historicalJson.Children().OrderBy(x => x["clientId"]).ToList();
-                var importSettings = importJson.Children().OrderBy(x => x["clientId"]).ToList();
+                var historicalSettings = databaseSettingsJsonModel.Children().OrderBy(x => x["clientId"]).ToList();
+                var importSettings = importSettingsJsonModel.Children().OrderBy(x => x["clientId"]).ToList();
 
                 JArray modifySettingList = new JArray();
                 foreach(var setting in importSettings)
@@ -240,12 +239,12 @@ namespace ConfigManager
             }
         }
 
-        public void PullRequestNewConfigSettings()
+        public void GeneratePullRequestFile()
         {
             var files = new List<string>();
             string importFile = GenerateImportSettings();
 
-            files.Add(GetHistoricalConfigSettings());
+            files.Add(GetDatabaseConfigSettings());
             files.Add(importFile);
             
             // Merge the historical data with the desired changes in a format for PR.
@@ -268,7 +267,7 @@ namespace ConfigManager
             p.Start();
 
             // Wait for the user to save the desired settings to import.
-            Console.WriteLine(Environment.NewLine + "Press [Enter] after you save the desired setting to import.");
+            Console.WriteLine(Environment.NewLine + "Press [Enter] after you save the desired settings to import.");
             Console.Read();
 
             // Remove formatting from file
