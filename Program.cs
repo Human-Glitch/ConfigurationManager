@@ -68,6 +68,7 @@ namespace ConfigManager
                     }
                 }
             }
+
             Console.Read();
         }
         
@@ -140,38 +141,51 @@ namespace ConfigManager
 
         public void AddNewSettings()
         {
-            Connection.Open();
-            Console.WriteLine(Environment.NewLine + Connection.State);
-
-            var importSettings = JsonConvert.DeserializeObject<List<Setting>>(GenerateImportSettings());
-
-            foreach(var item in importSettings)
+            try 
             {
-                var setting = new Setting
-                {
-                    ClientId = item.ClientId ?? string.Empty,
-                    SettingName = item.SettingName ?? string.Empty,
-                    SettingType = item.SettingType ?? string.Empty,
-                    SettingValue = item.SettingValue ?? string.Empty,
-                    IsEncrypted = item.IsEncrypted
-                };
+                Connection.Open();
+                Console.WriteLine(Environment.NewLine + Connection.State);
 
-                SqlCommand cmd  = new SqlCommand("dbo.uspInsertSettingDefinition", Connection) 
-                {
-                    CommandType = CommandType.StoredProcedure
-                };
+                var importSettings = JsonConvert.DeserializeObject<List<Setting>>(GenerateImportSettings());
 
-                cmd.Parameters.Add(new SqlParameter("@ClientId", setting.ClientId));
-                cmd.Parameters.Add(new SqlParameter("@SettingLevel", setting.ClientId));
-                cmd.Parameters.Add(new SqlParameter("@SettingName", setting.SettingName));
-                cmd.Parameters.Add(new SqlParameter("@SettingType", setting.SettingType));
-                cmd.Parameters.Add(new SqlParameter("@SettingValue", setting.SettingValue));
-                cmd.Parameters.Add(new SqlParameter("@IsEncrypted", setting.IsEncrypted));
-                cmd.ExecuteNonQuery();
+                foreach (var item in importSettings)
+                {
+                    var setting = new Setting
+                    {
+                        ClientId = item.ClientId ?? string.Empty,
+                        SettingName = item.SettingName ?? string.Empty,
+                        SettingType = item.SettingType ?? string.Empty,
+                        SettingValue = item.SettingValue ?? string.Empty,
+                        IsEncrypted = item.IsEncrypted
+                    };
+
+                    SqlCommand cmd = new SqlCommand("dbo.uspInsertSettingDefinition", Connection)
+                    {
+                        CommandType = CommandType.StoredProcedure
+                    };
+
+                    cmd.Parameters.Add(new SqlParameter("@ClientId", setting.ClientId));
+                    cmd.Parameters.Add(new SqlParameter("@SettingLevel", setting.SettingLevel));
+                    cmd.Parameters.Add(new SqlParameter("@SettingName", setting.SettingName));
+                    cmd.Parameters.Add(new SqlParameter("@SettingType", setting.SettingType));
+                    cmd.Parameters.Add(new SqlParameter("@SettingValue", setting.SettingValue));
+                    cmd.Parameters.Add(new SqlParameter("@IsEncrypted", setting.IsEncrypted));
+                    cmd.ExecuteNonQuery();
+                }
+
+                Connection.Close();
+                Console.WriteLine(Connection.State);
+            }
+            catch (Exception ex)
+            {
+                if (Connection.State == ConnectionState.Open)
+                {
+                    Connection.Close();
+                }
+
+                Console.WriteLine(ex.Message);
             }
 
-            Connection.Close();
-            Console.WriteLine(Connection.State);
         }
 
         public void ImportNewSettings()
@@ -210,6 +224,7 @@ namespace ConfigManager
                     var settingToInject = new Setting
                     {
                         ClientId = setting.ClientId ?? string.Empty,
+                        SettingLevel = setting.SettingLevel ?? string.Empty,
                         SettingName = setting.SettingName ?? string.Empty,
                         SettingType = setting.SettingType ?? string.Empty,
                         SettingValue = setting.SettingValue ?? string.Empty,
@@ -235,6 +250,11 @@ namespace ConfigManager
             }
             catch(Exception ex)
             {
+                if (Connection.State == ConnectionState.Open)
+                {
+                    Connection.Close();
+                }
+
                 Console.WriteLine(ex.Message);
             }
         }
