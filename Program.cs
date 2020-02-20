@@ -78,8 +78,8 @@ namespace ConfigManager
             {
                 Environment.NewLine,
                 "[1] Display Database Config Settings",
-                "[2] Generate New Settings for PR",
-                "[3] Manually Add New Settings",
+                "[2] Generate File for PR",
+                "[3] Add New Settings",
                 "[4] Import New Settings",
                 "[5] Exit"
             };
