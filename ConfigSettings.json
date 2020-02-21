@@ -16,14 +16,6 @@
     "IsEncrypted": false
   },
   {
-    "ClientId": "BCBSKS",
-    "SettingLevel": "client",
-    "SettingName": "variance_cap",
-    "SettingType": "decimal",
-    "SettingValue": "TWpBdU1EQT0=",
-    "IsEncrypted": true
-  },
-  {
     "ClientId": "BCBSTN",
     "SettingLevel": "client",
     "SettingName": "is_site_of_service",
@@ -42,9 +34,17 @@
   {
     "ClientId": "BCBSTN",
     "SettingLevel": "client",
-    "SettingName": "variance_cap",
-    "SettingType": "decimal",
-    "SettingValue": "40.00",
-    "IsEncrypted": false
+    "SettingName": "user_name",
+    "SettingType": "varchar(8)",
+    "SettingValue": "a29keWJ1c3M=",
+    "IsEncrypted": true
+  },
+  {
+    "ClientId": "blah",
+    "SettingLevel": "client",
+    "SettingName": "password",
+    "SettingType": "varchar(8)",
+    "SettingValue": "bXlQYXNzd29yZA==",
+    "IsEncrypted": true
   }
 ]

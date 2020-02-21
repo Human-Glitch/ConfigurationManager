@@ -79,8 +79,8 @@ namespace ConfigManager
                 Environment.NewLine,
                 "[1] Display Database Config Settings",
                 "[2] Generate File for PR",
-                "[3] Add New Settings",
-                "[4] Import New Settings",
+                "[3] Create New Setting Definitions",
+                "[4] Import Merged PR Settings",
                 "[5] Exit"
             };
 
@@ -153,6 +153,7 @@ namespace ConfigManager
                     var setting = new Setting
                     {
                         ClientId = item.ClientId ?? string.Empty,
+                        SettingLevel = item.SettingLevel ?? string.Empty,
                         SettingName = item.SettingName ?? string.Empty,
                         SettingType = item.SettingType ?? string.Empty,
                         SettingValue = item.SettingValue ?? string.Empty,
@@ -175,6 +176,7 @@ namespace ConfigManager
 
                 Connection.Close();
                 Console.WriteLine(Connection.State);
+                Console.WriteLine("Successfully modified setting definitions in the database.");
             }
             catch (Exception ex)
             {
@@ -192,8 +194,8 @@ namespace ConfigManager
         {
             try
             {
-                Console.WriteLine(Environment.NewLine + "Enter a file path for the desired import settings.");
-                var filePath = Console.ReadLine();
+                Console.WriteLine(Environment.NewLine + "Refreshing tables from ConfigSettings.json");
+                var filePath = @"C:\ProjectRepo\ConfigurationManager\ConfigSettings.json";
                 var importSettingsJson = File.ReadAllText(filePath);
                 var databaseSettingsJson = GetDatabaseConfigSettings();
 
@@ -268,8 +270,13 @@ namespace ConfigManager
             files.Add(importFile);
             
             // Merge the historical data with the desired changes in a format for PR.
-            var result = JToken.Parse(MergeJsons(files)).ToString(Formatting.Indented);
-            Console.WriteLine(result);
+            var results = JToken.Parse(MergeJsons(files)).ToString(Formatting.Indented);
+
+            var destinationFile = @"C:\ProjectRepo\ConfigurationManager\ConfigSettings.json";
+            //Path.GetFullPath(Environment.CurrentDirectory + @"\ConfigSettings.json");
+            File.WriteAllText(destinationFile, results);
+
+            Console.WriteLine($"Results written to {destinationFile}");
         }
 
         private string GenerateImportSettings()
@@ -277,6 +284,7 @@ namespace ConfigManager
             // Generate json template for importing config settings
             string tempPath = @$"{Path.GetTempPath()}\ImportConfigSettings.json";
             File.WriteAllText(tempPath, GenerateTemplateSettings());
+
 
             // Open the json file in the user's default app
             var p = new Process();
@@ -291,8 +299,16 @@ namespace ConfigManager
             Console.Read();
 
             // Remove formatting from file
-            var result = Regex.Replace(File.ReadAllText(tempPath), @"\t|\n|\r", string.Empty);
+            var importSettingsJson = Regex.Replace(File.ReadAllText(tempPath), @"\t|\n|\r", string.Empty); ;
+            var importSettingsJsonModel = JsonConvert.DeserializeObject<List<Setting>>(importSettingsJson);
 
+            importSettingsJsonModel
+                .Where(x => x.IsEncrypted = true)
+                .ToList()
+                .ForEach(x => x.SettingValue = Security.EncryptString(x.SettingValue));
+
+            var result = JsonConvert.SerializeObject(importSettingsJsonModel);
+            
             // Remove temporary file
             File.Delete(tempPath);
 
